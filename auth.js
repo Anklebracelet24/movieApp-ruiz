@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+JWT_SECRET_KEY = "movieApp-API";
 
 //[Environment Setup]
 require("dotenv").config();
