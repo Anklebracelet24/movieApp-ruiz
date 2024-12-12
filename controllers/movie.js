@@ -75,7 +75,6 @@ module.exports.getMovieById = async (req, res) => {
 // Update Movie
 module.exports.updateMovie = async (req, res) => {
   try {
-    // Get the movie ID from the request parameters
     const movieId = req.params.id;
 
     // Retrieve the movie from the database
@@ -83,28 +82,50 @@ module.exports.updateMovie = async (req, res) => {
 
     // If the movie is not found, return a 404 error
     if (!movie) {
-      res.status(404).json({ message: "Movie not found" });
-      return;
+      return res.status(404).json({ message: "Movie not found" });
     }
 
-    // Update the movie with the new data
-    movie.title = req.body.title || movie.title;
-    movie.director = req.body.director || movie.director;
-    movie.year = req.body.year || movie.year;
-    movie.description = req.body.description || movie.description;
-    movie.genre = req.body.genre || movie.genre;
+    // Update the movie with the new data from req.body
+    const updatedData = {
+      title: req.body.title || movie.title,
+      director: req.body.director || movie.director,
+      year: req.body.year || movie.year,
+      description: req.body.description || movie.description,
+      genre: req.body.genre || movie.genre,
+    };
+
+    // Check if at least one field is provided for update
+    if (
+      !updatedData.title &&
+      !updatedData.director &&
+      !updatedData.year &&
+      !updatedData.description &&
+      !updatedData.genre
+    ) {
+      return res.status(400).json({
+        message: "At least one field must be provided to update the movie.",
+      });
+    }
+
+    // Update the movie
+    Object.assign(movie, updatedData);
 
     // Save the updated movie to the database
-    await movie.save();
+    const savedMovie = await movie.save();
 
-    // Return a success message with the updated movie
-    res.status(200).json({
+    // Send a successful response with the updated movie
+    return res.status(200).json({
       message: "Movie updated successfully",
-      updatedMovie: movie,
+      updatedMovie: savedMovie,
     });
   } catch (error) {
-    // Return an error message if something goes wrong
-    res.status(500).json({ message: "Failed to update movie" });
+    // Log the error for debugging purposes
+    console.error(error); // Log the error details
+
+    // Return an error message with a general failure message
+    return res.status(500).json({
+      message: "Failed to update movie: " + error.message,
+    });
   }
 };
 
@@ -131,56 +152,34 @@ module.exports.deleteMovie = async (req, res) => {
 
 // Modified addComment function to work with PATCH route
 module.exports.addMovieComment = async (req, res) => {
-  const { id } = req.params; // Movie ID from URL
-  const { userId, comment } = req.body; // Comment and User ID from the body
-
-  // Validate that userId and comment are present
-  if (!userId || !comment) {
-    return res
-      .status(400)
-      .json({ message: "User ID and comment are required" });
-  }
-
   try {
+    const movieId = req.params.id;
+    const { userId, comment } = req.body;
+
     // Find the movie by ID
-    const movie = await Movie.findById(id);
+    const movie = await Movie.findById(movieId);
 
-    // Check if the movie exists
+    // If the movie doesn't exist, return a 404
     if (!movie) {
-      return res
-        .status(404)
-        .json({ message: "Movie with the given ID does not exist" });
+      return res.status(404).json({ message: "Movie not found" });
     }
 
-    // Add or update the comment
-    const newComment = { userId, comment };
-
-    // Check if the user has already commented on this movie
-    const existingCommentIndex = movie.comments.findIndex(
-      (commentObj) => commentObj.userId.toString() === userId.toString()
-    );
-
-    if (existingCommentIndex > -1) {
-      // If the user has already commented, update the comment
-      movie.comments[existingCommentIndex].comment = comment;
-    } else {
-      // Otherwise, add a new comment
-      movie.comments.push(newComment);
-    }
+    // Add the new comment to the movie's comments array
+    movie.comments.push({ userId, comment });
 
     // Save the updated movie document
     const updatedMovie = await movie.save();
 
-    // Return the updated movie and a success message
+    // Return the updated movie with status 200
     return res.status(200).json({
-      message: "comment added successfully",
+      message: "Comment added successfully",
       updatedMovie,
     });
   } catch (error) {
-    // Handle any other errors that might occur
+    console.error(error); // Log the error for debugging
     return res
       .status(500)
-      .json({ message: `An error occurred: ${error.message}` });
+      .json({ message: "An error occurred while adding the comment." });
   }
 };
 

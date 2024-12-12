@@ -1,8 +1,6 @@
 const jwt = require("jsonwebtoken");
-JWT_SECRET_KEY = "movieApp-API";
 
-//[Environment Setup]
-require("dotenv").config();
+require("dotenv").config(); // Load environment variables from .env file
 
 //[Token Creation]
 module.exports.createAccessToken = (user) => {
@@ -12,7 +10,15 @@ module.exports.createAccessToken = (user) => {
     isAdmin: user.isAdmin,
   };
 
-  return jwt.sign(data, process.env.JWT_SECRET_KEY, {});
+  // Access JWT_SECRET_KEY from environment variables
+  const jwtSecret = process.env.JWT_SECRET_KEY;
+
+  if (!jwtSecret) {
+    throw new Error("JWT_SECRET_KEY is not set in the environment variables");
+  }
+
+  // Create a JWT token using the secret from environment
+  return jwt.sign(data, jwtSecret, { expiresIn: "1h" }); // Optional expiry time
 };
 
 module.exports.verify = (req, res, next) => {
@@ -21,10 +27,21 @@ module.exports.verify = (req, res, next) => {
   let token = req.headers.authorization;
 
   if (typeof token === "undefined") {
-    return res.send({ auth: "Failed. No Token" });
+    return res.status(403).send({ auth: "Failed. No Token" });
   } else {
+    // Remove 'Bearer ' prefix if it exists
     token = token.slice(7, token.length);
-    jwt.verify(token, process.env.JWT_SECRET_KEY, function (err, decodedToken) {
+
+    const jwtSecret = process.env.JWT_SECRET_KEY;
+
+    if (!jwtSecret) {
+      return res.status(500).send({
+        message: "JWT_SECRET_KEY is missing in environment variables",
+      });
+    }
+
+    // Verify token using the secret from environment variables
+    jwt.verify(token, jwtSecret, function (err, decodedToken) {
       if (err) {
         return res.status(403).send({
           auth: "Failed",
@@ -51,19 +68,4 @@ module.exports.verifyAdmin = (req, res, next) => {
       message: "Action Forbidden",
     });
   }
-};
-
-module.exports.errorHandler = (err, req, res, next) => {
-  console.error(err);
-
-  const statusCode = err.status || 500;
-  const errorMessage = err.message || "Internal Server Error";
-
-  res.status(statusCode).json({
-    error: {
-      message: errorMessage,
-      errorCode: err.code || "SERVER_ERROR",
-      details: err.details || null,
-    },
-  });
 };
